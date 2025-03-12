@@ -5,6 +5,8 @@ from PIL import Image
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.responses import StreamingResponse
 
+from typing import Tuple
+
 app = FastAPI()
 
 # Constants
@@ -49,7 +51,7 @@ def compress_image(image, quality):
     image.save(buffer, format="JPEG", quality=quality, optimize=True)
     return buffer.getvalue()
 
-def compress_images_adaptive(images):
+def compress_images_adaptive(images: Tuple[Image.Image, bytes]):
     """
     Compresses images adaptively to ensure:
     - Each image is < 300 KB
