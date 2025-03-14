@@ -20,19 +20,35 @@ class ImageCompressor:
         """
         image = self._read_image_as_jpg(image_path)
         raw_size = self._get_image_size(image)
-        print(f'Raw image size is: {self._convert_b_to_kb(raw_size)} KB.')
         
         if not self._is_compression_required(raw_size):
             print('Raw size is less than target size. Skipping compression.')
             return self._compress_image(image, self.initial_quality)
 
-        test_size = self._test_compression(image)
-        final_quality = self._compute_optimal_quality(raw_size, test_size)
+        compression_per_percent = self._test_compression(image)
+        final_quality = self._compute_optimal_quality(raw_size, compression_per_percent)
         compressed = self._compress_image(image, final_quality)
 
+        # handling any remaining compression
+        if self._is_compression_required(len(compressed)):
+            compressed = self._do_iterative_compression(compressed, final_quality)
+        
         print(f'Final compressed image size is: {self._convert_b_to_kb(len(compressed))} KB.')
         return compressed
 
+    def _convert_bytes_to_pil(self, bytes_image: bytes) -> Image.Image:
+        return Image.open(io.BytesIO(bytes_image))
+
+    def _do_iterative_compression(self, bytes_image: bytes, image_quality: int) -> bytes:
+        image = self._convert_bytes_to_pil(bytes_image)
+
+        while self._is_compression_required(len(bytes_image)):
+            image_quality = image_quality - 1
+            bytes_image = self._compress_image(image, image_quality)
+
+            image = self._convert_bytes_to_pil(bytes_image)
+
+        return bytes_image
 
     def _read_image_as_jpg(self, image_path: str) -> Image.Image:
         image = Image.open(image_path)
@@ -56,16 +72,17 @@ class ImageCompressor:
         return image.convert("RGB")
 
     def _is_compression_required(self, raw_size: int) -> bool:
-        if raw_size < self.target_size:
-            return False
-        return True
+        print(f'Image size is: {self._convert_b_to_kb(raw_size)}')
+        if raw_size > self.target_size:
+            return True
+        return False
 
     def _test_compression(self, image):
         """Performs a test compression to estimate size reduction per test quality percentage."""
         test_compressed = self._compress_image(image, self.test_quality)
         return len(test_compressed)
 
-    def _compress_image(self, image, quality):
+    def _compress_image(self, image: Image.Image, quality: int) -> bytes:
         """Compresses an image to the given quality and format, returning its bytes."""
         buffer = io.BytesIO()
         image.save(buffer, format="JPEG", quality=quality, optimize=True)
@@ -80,15 +97,8 @@ class ImageCompressor:
             return self.initial_quality  # No meaningful reduction possible
 
         reduction_needed = raw_size - self.target_size
-        print(f'Unupdated reduction needed: {self._convert_b_to_kb(reduction_needed)}')
-
         estimated_compression = math.ceil(reduction_needed / size_reduction_per_percent)
-        print(f'Estimated compression quality: {estimated_compression}')
-        
-        estimated_compression_bytes = estimated_compression * size_reduction_per_percent
-        print(f'Estimated compression is: {self._convert_b_to_kb(estimated_compression_bytes)} KB.')
 
-        # Ensure compression does not go below the minimum allowed quality
         return (self.initial_quality - estimated_compression)
 
     def _convert_b_to_kb(self, byts: int) -> int:
@@ -102,6 +112,6 @@ class ImageCompressor:
 
 # Example usage
 if __name__ == "__main__":
-    compressor = ImageCompressor()
-    image_path = "sample2.png"  # Test with PNG or JPEG
+    compressor = ImageCompressor(target_size=150*1024)
+    image_path = "sample.jpg"  # Test with PNG or JPEG
     compressed_bytes = compressor.compress(image_path)

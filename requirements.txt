@@ -1,5 +1,7 @@
 fastapi
 uvicorn[standard]
-PyMuPDF
 Pillow
 python-multipart
+python-magic
+
+poppler
