@@ -1,5 +1,6 @@
 import os
 import io
+import uvicorn
 from typing import  List
 import zipfile
 from fastapi import FastAPI, UploadFile, File, HTTPException, status
@@ -13,6 +14,11 @@ UPLOAD_FOLDER = "uploads"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 app = FastAPI()
+
+
+@app.get("/")
+def read_root():
+    return {"message": "Hello, Compressor is running."}
 
 
 @app.post("/compress", summary="Extract and compress PDF images")
@@ -92,3 +98,8 @@ def generate_zip_response(images_bytes: List[bytes]) -> StreamingResponse:
 
     logger.info('Compression done. Returning zip file.')
     return StreamingResponse(zip_buffer, media_type="application/zip", headers=headers)
+
+
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 8000))  # Use Render's assigned PORT
+    uvicorn.run(app, host="0.0.0.0", port=port)
