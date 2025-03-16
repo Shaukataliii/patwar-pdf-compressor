@@ -1,7 +1,8 @@
+flask
+werkzeug
 fastapi
 uvicorn[standard]
 Pillow
 python-multipart
 python-magic
-
-poppler
+pymupdf

@@ -1,7 +1,9 @@
 import io
-import os
 import math
+from typing import List
 from PIL import Image
+
+from models.logger import logger
 
 class ImageCompressor:
     def __init__(self, target_size=250 * 1024, initial_quality=100, test_quality=99, min_quality=30):
@@ -14,15 +16,51 @@ class ImageCompressor:
         self.min_quality = min_quality
         self.image_path = None
 
-    def compress(self, image_path: str):
+    def compress_images(self, images: List[Image.Image], combine_max_size: int= 3072 * 1024) -> List[Image.Image]:
+        c_images = []
+
+        sizes = self._get_images_size(images)
+        if sum(sizes) < combine_max_size:
+
+            for image in images:
+                compressed = self.compress_it(image)
+                c_images.append(compressed)
+
+        else:
+            required_sizes = self._compute_required_sizes(combine_max_size, sizes)
+            
+            for image, required_size in zip(images, required_sizes):
+                self.target_size = required_size    # to compress the image upto this size
+
+                compressed = self.compress_it(image)
+                c_images.append(compressed)
+
+        logger.info(f'Returning {len(c_images)} compressed images.')
+        return c_images
+
+    def _get_images_size(self, images: List[Image.Image]) -> List[int]:
+        raw_size = []
+        for image in images:
+            raw_size.append(self._get_image_size(image))
+
+        return raw_size
+    
+    def _compute_required_sizes(self, combine_max_size: int, sizes: List[int]) -> List[int]:
+        """Returns a list of sizes that makes sure that the combine size of those is not more than the combine_max.
         """
-        Compresses an image to approximately the target size using heuristic adaptive compression.
+        scaling_factor = combine_max_size / sum(sizes)
+        target_sizes = [int(size * scaling_factor) for size in sizes]
+        return target_sizes
+
+    def compress_it(self, image: Image.Image):
         """
-        image = self._read_image_as_jpg(image_path)
+        Compresses an image to approximately the target size using heuristic adaptive compression. Skips compression if size is less than target size.
+        """
         raw_size = self._get_image_size(image)
+        logger.info(f'Image size is: {self._convert_b_to_kb(raw_size)}')
         
         if not self._is_compression_required(raw_size):
-            print('Raw size is less than target size. Skipping compression.')
+            logger.info('Raw size is less than target size. Skipping compression.')
             return self._compress_image(image, self.initial_quality)
 
         compression_per_percent = self._test_compression(image)
@@ -33,8 +71,17 @@ class ImageCompressor:
         if self._is_compression_required(len(compressed)):
             compressed = self._do_iterative_compression(compressed, final_quality)
         
-        print(f'Final compressed image size is: {self._convert_b_to_kb(len(compressed))} KB.')
+        logger.info(f'Final compressed image size is: {self._convert_b_to_kb(len(compressed))} KB.')
         return compressed
+    
+    def _is_compression_required(self, raw_size: int) -> bool:
+        if raw_size > self.target_size:
+            return True
+        return False
+
+    def _get_image_size(self, image: Image.Image) -> int:
+        """Returns the size of an image in bytes."""
+        return len(self._compress_image(image, self.initial_quality))
 
     def _convert_bytes_to_pil(self, bytes_image: bytes) -> Image.Image:
         return Image.open(io.BytesIO(bytes_image))
@@ -50,33 +97,6 @@ class ImageCompressor:
 
         return bytes_image
 
-    def _read_image_as_jpg(self, image_path: str) -> Image.Image:
-        image = Image.open(image_path)
-
-        format = image.format
-        if format == "PNG":
-            image = self._convert_png_to_jpeg(image)
-        
-        return image
-    
-    def _get_image_size(self, image: Image.Image) -> int:
-        """Returns the size of an image in bytes."""
-        return len(self._compress_image(image, self.initial_quality))
-
-    def _convert_png_to_jpeg(self, image):
-        """Converts a PNG (with transparency) to JPEG format by removing the alpha channel."""
-        if image.mode in ("RGBA", "LA"):
-            background = Image.new("RGB", image.size, (255, 255, 255))  # White background
-            background.paste(image, mask=image.split()[3])  # Apply alpha channel as mask
-            return background
-        return image.convert("RGB")
-
-    def _is_compression_required(self, raw_size: int) -> bool:
-        print(f'Image size is: {self._convert_b_to_kb(raw_size)}')
-        if raw_size > self.target_size:
-            return True
-        return False
-
     def _test_compression(self, image):
         """Performs a test compression to estimate size reduction per test quality percentage."""
         test_compressed = self._compress_image(image, self.test_quality)
@@ -91,7 +111,7 @@ class ImageCompressor:
     def _compute_optimal_quality(self, raw_size, test_size):
         """Computes the estimated quality reduction required to reach the target size."""
         size_reduction_per_percent = raw_size - test_size
-        print(f'Size reduction per percent is: {self._convert_b_to_kb(size_reduction_per_percent)} KB.')
+        logger.info(f'Size reduction per percent is: {self._convert_b_to_kb(size_reduction_per_percent)} KB.')
 
         if size_reduction_per_percent <= 0:
             return self.initial_quality  # No meaningful reduction possible
@@ -113,5 +133,6 @@ class ImageCompressor:
 # Example usage
 if __name__ == "__main__":
     compressor = ImageCompressor(target_size=150*1024)
-    image_path = "sample.jpg"  # Test with PNG or JPEG
-    compressed_bytes = compressor.compress(image_path)
+    image_path = "sample.jpg"
+    image = Image.open(image_path)
+    compressed_bytes = compressor.compress_it(image)
