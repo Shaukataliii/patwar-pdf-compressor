@@ -3,7 +3,8 @@ import io
 import uvicorn
 from typing import  List
 import zipfile
-from fastapi import FastAPI, UploadFile, File, HTTPException, status
+from fastapi import FastAPI, Depends, HTTPException, Header, status, UploadFile, File
+# from fastapi.openapi.docs import get_swagger_ui_html, get_redoc_html
 from fastapi.responses import StreamingResponse
 
 from models.pdf_processor import PDFProcessor
@@ -14,15 +15,36 @@ UPLOAD_FOLDER = "uploads"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 app = FastAPI()
+ALLOWED_ORIGIN = os.getenv('ALLOWED_ORIGIN')
+API_KEY = os.getenv('API_KEY')
+# print(API_KEY)
 
 
 @app.get("/")
 def read_root():
     return {"message": "Hello, Compressor is running."}
 
+@app.get("/docs", include_in_schema=False)
+@app.get("/redoc", include_in_schema=False)
+async def disabled_docs():
+    raise HTTPException(status_code=404, detail="Not allowed.")
+
+def verify_api_key(api_key: str = Header(None), origin: str = Header(None)):
+    if api_key != API_KEY:
+        logger.error(f'Invalid API KEY: {api_key}')
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Invalid API Key",
+        )
+    if origin and origin != ALLOWED_ORIGIN:
+        logger.error(f'Invalid origin: {origin}')
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Request not allowed from this origin",
+        )
 
 @app.post("/compress", summary="Extract and compress PDF images")
-async def compress_pdf(file: UploadFile = File(...)) -> StreamingResponse:
+async def compress_pdf(file: UploadFile = File(...), _: None = Depends(verify_api_key)) -> StreamingResponse:
     """
     Accepts a PDF upload, extracts images, compresses them,
     packs them into a ZIP file, and returns the ZIP for download.
@@ -61,7 +83,6 @@ async def save_uploaded_file(file: UploadFile) -> str:
         f.write(content)
     return file_path
 
-
 def process_pdf(file_path: str) -> List[bytes]:
     """
     Processes the PDF: validates, extracts images, and compresses them.
@@ -77,7 +98,6 @@ def process_pdf(file_path: str) -> List[bytes]:
 
     images = processor.extract_images()
     return compressor.compress_images(images)
-
 
 def generate_zip_response(images_bytes: List[bytes]) -> StreamingResponse:
     """
@@ -98,6 +118,8 @@ def generate_zip_response(images_bytes: List[bytes]) -> StreamingResponse:
 
     logger.info('Compression done. Returning zip file.')
     return StreamingResponse(zip_buffer, media_type="application/zip", headers=headers)
+
+
 
 
 if __name__ == "__main__":
