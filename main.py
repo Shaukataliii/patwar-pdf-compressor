@@ -1,7 +1,7 @@
 import os
 import io
 import uvicorn
-from typing import  List
+from typing import List
 import zipfile
 from fastapi import FastAPI, Depends, HTTPException, Header, status, UploadFile, File
 from fastapi.responses import StreamingResponse
@@ -15,18 +15,29 @@ UPLOAD_FOLDER = "uploads"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 app = FastAPI()
-ALLOWED_ORIGIN = os.getenv('ALLOWED_ORIGIN')
-API_KEY = os.getenv('API_KEY')
-# print(API_KEY)
 
-# CORS settings (Allow your frontend domain)
+# Set ALLOWED_ORIGIN with a fallback to "*"
+ALLOWED_ORIGIN = os.getenv('ALLOWED_ORIGIN', "*")
+API_KEY = os.getenv('API_KEY')
+
+# CORS Middleware (single instance)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[ALLOWED_ORIGIN],  # You can also use ["*"] for all origins (not recommended for security)
+    allow_origins=[ALLOWED_ORIGIN],  # Ensure this is set correctly
     allow_credentials=True,
-    allow_methods=["*"],  # Allow all HTTP methods including OPTIONS
-    allow_headers=["*"],  # Allow all headers, including API-Key
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
+
+# Optional: Middleware to ensure CORS headers in all responses
+@app.middleware("http")
+async def add_cors_headers(request, call_next):
+    response = await call_next(request)
+    if "Access-Control-Allow-Origin" not in response.headers:
+        response.headers["Access-Control-Allow-Origin"] = ALLOWED_ORIGIN
+        response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
+        response.headers["Access-Control-Allow-Headers"] = "Authorization, Content-Type"
+    return response
 
 @app.get("/")
 def read_root():
@@ -53,10 +64,6 @@ def verify_api_key(api_key: str = Header(None), origin: str = Header(None)):
 
 @app.post("/compress", summary="Extract and compress PDF images")
 async def compress_pdf(file: UploadFile = File(...), _: None = Depends(verify_api_key)) -> StreamingResponse:
-    """
-    Accepts a PDF upload, extracts images, compresses them,
-    packs them into a ZIP file, and returns the ZIP for download.
-    """
     logger.info('\nRequest received.')
     if not file.filename:
         raise HTTPException(
@@ -75,26 +82,16 @@ async def compress_pdf(file: UploadFile = File(...), _: None = Depends(verify_ap
 
     return generate_zip_response(images)
 
-
 async def save_uploaded_file(file: UploadFile) -> str:
-    """
-    Saves the uploaded file to disk and returns its path.
-    """
     name = 'uploaded_pdf.pdf'
     file_path = os.path.join(UPLOAD_FOLDER, name)
 
-    # update this if wanna save the uploaded pdf.
-    # name = file.filename
-    
     with open(file_path, "wb") as f:
         content = await file.read()
         f.write(content)
     return file_path
 
 def process_pdf(file_path: str) -> List[bytes]:
-    """
-    Processes the PDF: validates, extracts images, and compresses them.
-    """
     processor = PDFProcessor(file_path)
     compressor = ImageCompressor()
 
@@ -108,15 +105,6 @@ def process_pdf(file_path: str) -> List[bytes]:
     return compressor.compress_images(images)
 
 def generate_zip_response(images_bytes: List[bytes]) -> StreamingResponse:
-    """
-    Creates a ZIP file from a list of image bytes and returns it as a StreamingResponse.
-
-    Parameters:
-        images_bytes (List[bytes]): A list containing PNG image data in bytes.
-
-    Returns:
-        StreamingResponse: A response object with the zipped images for download.
-    """
     zip_buffer = io.BytesIO()
     with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
         for idx, img_bytes in enumerate(images_bytes):
@@ -127,9 +115,6 @@ def generate_zip_response(images_bytes: List[bytes]) -> StreamingResponse:
     logger.info('Compression done. Returning zip file.')
     return StreamingResponse(zip_buffer, media_type="application/zip", headers=headers)
 
-
-
-
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 8000))  # Use Render's assigned PORT
+    port = int(os.environ.get("PORT", 8000))
     uvicorn.run(app, host="0.0.0.0", port=port)
