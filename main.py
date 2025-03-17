@@ -4,8 +4,8 @@ import uvicorn
 from typing import  List
 import zipfile
 from fastapi import FastAPI, Depends, HTTPException, Header, status, UploadFile, File
-# from fastapi.openapi.docs import get_swagger_ui_html, get_redoc_html
 from fastapi.responses import StreamingResponse
+from fastapi.middleware.cors import CORSMiddleware
 
 from models.pdf_processor import PDFProcessor
 from models.compressor import ImageCompressor
@@ -19,6 +19,14 @@ ALLOWED_ORIGIN = os.getenv('ALLOWED_ORIGIN')
 API_KEY = os.getenv('API_KEY')
 # print(API_KEY)
 
+# CORS settings (Allow your frontend domain)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[ALLOWED_ORIGIN],  # You can also use ["*"] for all origins (not recommended for security)
+    allow_credentials=True,
+    allow_methods=["*"],  # Allow all HTTP methods including OPTIONS
+    allow_headers=["*"],  # Allow all headers, including API-Key
+)
 
 @app.get("/")
 def read_root():
