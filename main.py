@@ -5,7 +5,7 @@ import uvicorn
 from typing import List
 import zipfile
 from fastapi import FastAPI, HTTPException, Header, status, UploadFile, File
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi import Depends
 
@@ -15,6 +15,7 @@ from models.logger import logger
 
 UPLOAD_FOLDER = "uploads"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
 
 app = FastAPI()
 API_KEY = os.getenv('API_KEY')
@@ -28,6 +29,8 @@ app.add_middleware(
     allow_headers=["Authorization", "Content-Type"],
     expose_headers=["Content-Disposition"]  # Required for file downloads
 )
+
+
 
 
 async def verify_api_key(authorization: str = Header(...)):
@@ -53,6 +56,12 @@ async def verify_api_key(authorization: str = Header(...)):
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Invalid API Key"
         )
+    
+
+@app.options("/compress")
+async def compress_pdf():
+    return Response(status_code=200, headers={"Allow": "OPTIONS, POST"})
+
 
 @app.post("/compress")
 async def compress_pdf(
