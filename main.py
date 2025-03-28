@@ -20,11 +20,12 @@ app = FastAPI()
 API_KEY = os.getenv('API_KEY')
 
 # Enhanced CORS Configuration for WordPress
+# In your FastAPI app (app.py)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Replace with your WordPress domain in production
+    allow_origins=["https://shaukat.tech"],  # Your WordPress domain
     allow_credentials=True,
-    allow_methods=["POST", "OPTIONS"],
+    allow_methods=["POST", "OPTIONS"],  # Only needed methods
     allow_headers=["Authorization", "Content-Type"],
 )
 
