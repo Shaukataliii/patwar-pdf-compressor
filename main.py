@@ -20,14 +20,15 @@ app = FastAPI()
 API_KEY = os.getenv('API_KEY')
 
 # Enhanced CORS Configuration for WordPress
-# In your FastAPI app (app.py)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["https://shaukat.tech"],  # Your WordPress domain
     allow_credentials=True,
-    allow_methods=["POST", "OPTIONS"],  # Only needed methods
+    allow_methods=["POST", "OPTIONS"],  # Explicitly allow both
     allow_headers=["Authorization", "Content-Type"],
+    expose_headers=["Content-Disposition"]  # Required for file downloads
 )
+
 
 async def verify_api_key(authorization: str = Header(...)):
     """Validate Authorization header with Bearer token"""
