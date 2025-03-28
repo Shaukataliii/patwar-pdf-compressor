@@ -7,7 +7,7 @@ import zipfile
 from fastapi import FastAPI, HTTPException, Header, status, UploadFile, File
 from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.dependencies import Depends
+from fastapi import Depends
 
 from models.pdf_processor import PDFProcessor
 from models.compressor import ImageCompressor
