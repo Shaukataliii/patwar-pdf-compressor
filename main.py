@@ -24,7 +24,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=["https://shaukat.tech"],  # Your WordPress domain
     allow_credentials=True,
-    allow_methods=["POST", "OPTIONS"],  # Explicitly allow both
+    allow_methods=["POST", "OPTIONS", "HEAD"],  # Explicitly allow both
     allow_headers=["Authorization", "Content-Type"],
     expose_headers=["Content-Disposition"]  # Required for file downloads
 )
