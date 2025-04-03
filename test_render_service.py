@@ -3,14 +3,21 @@ import requests
 
 s_time = time.perf_counter()
 
-APP_URL = "https://patwar-pdf-compressor.onrender.com/compress"
-API_KEY = 'THE KEY'
-PDF_FILE_PATH = "awais-baay-fard-docs-2.pdf"
+# APP_URL = "https://patwar-pdf-compressor.onrender.com/compress"
+APP_URL = "http://127.0.0.1:8000/compress"
+API_KEY = '84dd553da57d8a845861f07ed502c093'
+TARGET_SIZE = 2097152
+SINGLE_IMG_TARGET_SIZE = 204800
+
+
+PDF_FILE_PATH = "docs.pdf"
 ZIP_FILE_PATH = "compressed_images.zip"
 
 headers = {
-    "API-Key": API_KEY,
-    "Referer": "https://shaukat.tech/"
+    "Authorization": f"Bearer {API_KEY}",
+    "Referer": "https://shaukat.tech/",
+    "target-size": str(TARGET_SIZE),
+    "single-img-target-size": str(SINGLE_IMG_TARGET_SIZE)
 }
 
 with open(PDF_FILE_PATH, "rb") as pdf_file:

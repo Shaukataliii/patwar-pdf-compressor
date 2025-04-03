@@ -66,7 +66,9 @@ async def compress_pdf():
 @app.post("/compress")
 async def compress_pdf(
     file: UploadFile = File(...),
-    authorization: str = Header(...)
+    authorization: str = Header(...),
+    target_size: int = Header(...),
+    single_img_target_size: int = Header(...)
 ) -> StreamingResponse:
     """
     Process PDF file from WordPress with API key validation
@@ -86,7 +88,7 @@ async def compress_pdf(
 
         # Process PDF
         file_path = await save_uploaded_file(file)
-        images = process_pdf(file_path)
+        images = process_pdf(file_path, target_size, single_img_target_size)
 
         if not images:
             raise HTTPException(
@@ -115,9 +117,9 @@ async def save_uploaded_file(file: UploadFile) -> str:
         f.write(content)
     return file_path
 
-def process_pdf(file_path: str) -> List[bytes]:
+def process_pdf(file_path: str, combine_max_size: int = 3072 * 1024, single_max_size: int = 250 * 1024) -> List[bytes]:
     processor = PDFProcessor(file_path)
-    compressor = ImageCompressor()
+    compressor = ImageCompressor(single_max_size)
 
     if not processor.validate_pdf():
         raise HTTPException(
@@ -126,7 +128,7 @@ def process_pdf(file_path: str) -> List[bytes]:
         )
 
     images = processor.extract_images()
-    return compressor.compress_images(images)
+    return compressor.compress_images(images, combine_max_size)
 
 def generate_zip_response(images_bytes: List[bytes]) -> StreamingResponse:
     zip_buffer = io.BytesIO()

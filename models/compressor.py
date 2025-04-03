@@ -6,11 +6,11 @@ from PIL import Image
 from models.logger import logger
 
 class ImageCompressor:
-    def __init__(self, target_size=250 * 1024, initial_quality=100, test_quality=99, min_quality=30):
+    def __init__(self, single_img_target_size=250 * 1024, initial_quality=100, test_quality=99, min_quality=30):
         """
         Initializes the ImageCompressor with default or user-defined settings.
         """
-        self.target_size = target_size
+        self.target_size = single_img_target_size
         self.initial_quality = initial_quality
         self.test_quality = test_quality
         self.min_quality = min_quality
