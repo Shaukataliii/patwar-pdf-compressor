@@ -4,6 +4,7 @@ import io
 import uvicorn
 from typing import List
 import zipfile
+import PIL
 from fastapi import FastAPI, HTTPException, Header, status, UploadFile, File
 from fastapi.responses import StreamingResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
@@ -18,7 +19,8 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 
 app = FastAPI()
-API_KEY = os.getenv('API_KEY')
+# API_KEY = os.getenv('API_KEY')
+API_KEY = 'abc'
 
 # Enhanced CORS Configuration for WordPress
 app.add_middleware(
@@ -68,7 +70,8 @@ async def compress_pdf(
     file: UploadFile = File(...),
     authorization: str = Header(...),
     target_size: int = Header(...),
-    single_img_target_size: int = Header(...)
+    single_img_target_size: int = Header(...),
+    return_pdf: bool = Header(...)
 ) -> StreamingResponse:
     """
     Process PDF file from WordPress with API key validation
@@ -96,7 +99,7 @@ async def compress_pdf(
                 detail="No images found in PDF"
             )
 
-        return generate_zip_response(images)
+        return generate_pdf_response(images) if return_pdf else generate_zip_response(images)
 
     except HTTPException as he:
         logger.error(f"HTTP Error {he.status_code}: {he.detail}")
@@ -132,13 +135,42 @@ def process_pdf(file_path: str, combine_max_size: int = 3072 * 1024, single_max_
 
 def generate_zip_response(images_bytes: List[bytes]) -> StreamingResponse:
     zip_buffer = io.BytesIO()
+
     with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
         for idx, img_bytes in enumerate(images_bytes):
             zip_file.writestr(f"page_{idx + 1}.png", img_bytes)
     zip_buffer.seek(0)
-    headers = {"Content-Disposition": "attachment; filename=compressed_images.zip"}
+
+    headers = {"Content-Disposition": "attachment; filename=compressed.zip"}
     logger.info('Compression complete')
+
     return StreamingResponse(zip_buffer, media_type="application/zip", headers=headers)
+
+
+def generate_pdf_response(images_bytes: List[bytes]) -> StreamingResponse:
+    # Convert JPEG bytes to RGB images
+    images = [PIL.Image.open(io.BytesIO(img_bytes)).convert("RGB") for img_bytes in images_bytes]
+
+    if not images:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="The pdf doesn't contain any images."
+        )
+
+    pdf_buffer = io.BytesIO()
+    images[0].save(
+        pdf_buffer,
+        format="PDF",
+        save_all=True,
+        append_images=images[1:]
+    )
+    pdf_buffer.seek(0)
+
+    headers = {"Content-Disposition": "attachment; filename=compressed.pdf"}
+    logger.info('Compression complete')
+    
+    return StreamingResponse(pdf_buffer, media_type="application/pdf", headers=headers)
+
 
 @app.get("/health")
 async def health_check():
