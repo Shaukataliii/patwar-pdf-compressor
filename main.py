@@ -19,8 +19,7 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 
 app = FastAPI()
-# API_KEY = os.getenv('API_KEY')
-API_KEY = 'abc'
+API_KEY = os.getenv('API_KEY')
 
 # Enhanced CORS Configuration for WordPress
 app.add_middleware(
